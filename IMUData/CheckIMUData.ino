@@ -18,8 +18,9 @@ void loop() {
 	Wire.endTransmission();
 	Wire.requestFrom(DeviceAddressG, 2);//Request the 2 incoming bytes.
 	int i = 0;
-	while (i < 2) {
+	while (i < 2){
 		Serial.print(Wire.read());
+		i = i + 1;
 	}
 }
 

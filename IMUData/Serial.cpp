@@ -1,6 +1,6 @@
 #include <Arduino.h>
 #include <Wire.h>
-#include<Serial.hpp>
+#include <Serial.h>
 
 
 bool serial::getmessage() {
@@ -8,36 +8,37 @@ bool serial::getmessage() {
 	//false
 
 	if (Serial.available()) {
-		if (Serial.read() - '0' == 0) {// Checks for Start of a instruction if Serial is 0 new instruction available. The 0 value is discarded
+		if (Serial.read() == 0) {// Checks for Start of a instruction if Serial is 0 new instruction available. The 0 value is discarded
 
 			int i = 0;
 			while (Serial.available()) {
 
-				if (i < 255) {
-					if (Serial.peek() - '0' == 0) {
+				if (i < MAX_MESSAGE_SIZE) {
+
+					if (Serial.peek() == 0) {
 						//If the current read is a 0 than we are at the end of the message. The peek function doesn't 
 						//delete the byte so it gets stored in data.
-						Serial.read();//Delete 0 from buffer if we enter this loop.
-
-						serialobj.decode(&message[0], size_message, &dec_mess[0]);
+						i++;//Increment
+						rx_message.message[i] = Serial.read();//Delete 0 from buffer and store it in message.
+						Serial.println("Leaving Loop");
+						decode_COBS();
 						//Decode the incoming COBs message and store it in decoded message.
-
+						rx_message.size = i + 1;
 						return true;//Get out of While Loop
 					}
-					message[i] = Serial.read() - '0';//Store the incoming bytes in array
+					Serial.println("Storing Data");
+					rx_message.message[i] = Serial.read();//Store the incoming bytes in array
 					i++;
 				}
 				else //If we are greater than 255 bytes read and delete incoming message till its end 
 				{
-					if (Serial.read() - '0' == 0) {
+					if (Serial.read() == 0) {
 						//If the current read is a 0 than we are at the end of the message. 
 						return false;//Get out of the function, and return false (!no message)
 					}
 				}
 
-				return true;//Return true, and go ahead on 
-				Serial.flush();//Flushes Serial buffer After finishing Storing Instruction
-			}
+			} Serial.print("Serial Not Available");
 		}
 	}
 	else
@@ -62,7 +63,7 @@ void serial::printdata(byte* data) {
 /// \returns The number of bytes in the encoded buffer.
 /// \warning destination must have a minimum capacity of
 ///     (size + size / 254 + 1).
-size_t serial::encode(const uint8_t* source, size_t size, uint8_t* destination)
+size_t serial::encode_COBS(const uint8_t* source, size_t size, uint8_t* destination)
 {
 	size_t read_index = 0;
 	size_t write_index = 1;
@@ -103,39 +104,38 @@ size_t serial::encode(const uint8_t* source, size_t size, uint8_t* destination)
 /// \param destination The target buffer for the decoded bytes.
 /// \returns The number of bytes in the decoded buffer.
 /// \warning destination must have a minimum capacity of size.
-size_t serial::decode(const uint8_t* source, size_t size, uint8_t* destination)
+void serial::decode_COBS()
 {
-	if (size == 0)
-		return 0;
-
 	size_t read_index = 0;
 	size_t write_index = 0;
 	uint8_t code;
 	uint8_t i;
 
-	while (read_index < size)
+	while (read_index < rx_message.size)
 	{
-		code = source[read_index];
+		code = rx_message.message[read_index];
 
-		if (read_index + code > size && code != 1)
+		if (read_index + code > rx_message.size && code != 1)
 		{
-			return 0;
+			break;
 		}
 
 		read_index++;
 
 		for (i = 1; i < code; i++)
 		{
-			destination[write_index++] = source[read_index++];
+			decoded_rx_message.message[write_index++] = rx_message.message[read_index++];
 		}
 
-		if (code != 0xFF && read_index != size)
+		if (code != 0xFF && read_index != rx_message.size)
 		{
-			destination[write_index++] = '\0';
+			decoded_rx_message.message[write_index++] = '\0';
 		}
+
 	}
 
-	return write_index;
+	decoded_rx_message.size = write_index + 1;
+	return;
 }
 /// \Get the maximum encoded buffer size needed for a given source size.
 /// \param sourceSize The size of the buffer to be encoded.
@@ -159,33 +159,44 @@ uint16_t serial::Fletcher16(uint8_t *data, int count)
 	}
 	return (sum2 << 8) | sum1;
 }
+/*
+uint16_t serial::mess_checksum16() {
 
-uint16_t serial::checksum16(byte *arr, int start, int end) {
-	int i = start;
-	byte checksumarr[30];
-	while (i < end) {
-		checksumarr[i];
+	byte checksumarr[size_message];//New Array Which Is message size -2
+	for(int k =0; k < (size_message - 2); k++) {
+		checksumarr[k] = dec_mess[k];
 	}
-	uint16_t c_sum = Fletcher16(&(checksumarr[0]), size_message);
+	uint16_t c_sum = Fletcher16(&(checksumarr[0]), (size_message - 2));
 	return c_sum;
 }
-bool serial::val_checksum(byte *arr) {
-	uint16_t csum;//Total 16bit check sum
-	uint8_t c0, c1, f0, f1;
-	uint16_t c_sum = checksum16(arr, 0, incmessageprop.l_CU);
-	//Calculate the check sum of incoming message of requested ID.
-	f0 = csum & 0xff;
-	f1 = (csum >> 8) & 0xff;
-	c0 = 0xff - ((f0 + f1) % 0xff);//Check Sum Upper 
-	c1 = 0xff - ((f0 + c0) % 0xff);//Check SUm Lower
-	if (arr[incmessageprop.l_CU] == c0 && arr[incmessageprop.l_CL] == c1) {
+
+uint16_t serial::IMUData_checksum16() {
+	byte checksumarr[size_outgoingIMU];//New Array Which Is message size -2
+	for (int k = 0; k < (size_outgoingIMU - 2); k++) {
+		checksumarr[k] = dec_mess[k];
+	}
+	uint16_t c_sum = Fletcher16(&(checksumarr[0]), (size_outgoingIMU - 2));
+	return c_sum;
+}
+
+uint16_t serial::GPSData_checksum16() {
+	byte checksumarr[size_outgoingGPS];//New Array Which Is message size -2
+	for (int k = 0; k < (size_outgoingGPS - 2); k++) {
+		checksumarr[k] = dec_mess[k];
+	}
+	uint16_t c_sum = Fletcher16(&(checksumarr[0]), (size_outgoingGPS - 2));
+	return c_sum;
+}*/
+
+bool serial::val_checksum() {
+	uint16_t received_message_checksum = Fletcher16(decoded_rx_message.message, (decoded_rx_message.size - 2));
+	uint16_t checksum = (decoded_rx_message.message[decoded_rx_message.size - 2] << 8) | decoded_rx_message.message[decoded_rx_message.size - 1];
+	if (received_message_checksum == checksum) {
 		return true;
 	}
-	else
-	{
+	else {
 		return false;
 	}
-
 }
 
 bool serial::contains(byte* data, byte check, int checklocation) {
@@ -199,8 +210,8 @@ bool serial::contains(byte* data, byte check, int checklocation) {
 	}
 }
 
-bool serial::validatemessge() {
-	if (val_checksum(&dec_mess[0]) && contains(&(dec_mess[0]), MessageID, incmessageprop.mess_ID)) {
+bool serial::validatemessage() {
+	if (val_checksum() && contains(&(rx_message.message[0]), MessageID, incmessageprop.mess_ID)) {
 		//if Validitate the checksum equals to what we calculate and message ID is addressed to us return true
 		return true;
 	}
@@ -209,10 +220,11 @@ bool serial::validatemessge() {
 	}
 }
 
-void serial::sendmessage(byte* message ) {
+void serial::sendmessage(byte* message) {
+	//message[]
 	const int size = sizeof(message) + 2;
 	//size of COBs encoded buffer is size of non encoded buffer +1 
 	byte outgoingmessage[size];
-	encode(message, sizeof(message), outgoingmessage);
+	encode_COBS(message, sizeof(message), outgoingmessage);
 	Serial.write(message, sizeof(message));
 }
