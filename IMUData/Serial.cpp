@@ -7,8 +7,8 @@ bool serial::getmessage() {
 	//Function fills the provided array with data from incoming serial if there is a serial available other wise returns
 	//false
 
-	if (Serial.available()) {
-		if (Serial.read() == 0) {// Checks for Start of a instruction if Serial is 0 new instruction available. The 0 value is discarded
+	if (Serial.available() && Serial.read() == 0) {
+	// Checks for Start of a instruction if Serial is 0 new instruction available. The 0 value is discarded.
 
 			int i = 0;
 			while (Serial.available()) {
@@ -18,12 +18,13 @@ bool serial::getmessage() {
 					if (Serial.peek() == 0) {
 						//If the current read is a 0 than we are at the end of the message. The peek function doesn't 
 						//delete the byte so it gets stored in data.
-						i++;//Increment
+						
 						rx_message.message[i] = Serial.read();//Delete 0 from buffer and store it in message.
 						Serial.println("Leaving Loop");
+						rx_message.size = i+1;
 						decode_COBS();
 						//Decode the incoming COBs message and store it in decoded message.
-						rx_message.size = i + 1;
+
 						return true;//Get out of While Loop
 					}
 					Serial.println("Storing Data");
@@ -39,7 +40,8 @@ bool serial::getmessage() {
 				}
 
 			} Serial.print("Serial Not Available");
-		}
+		
+		
 	}
 	else
 	{
