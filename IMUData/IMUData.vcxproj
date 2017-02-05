@@ -77,16 +77,13 @@
     <DebuggerFlavor>VisualMicroDebugger</DebuggerFlavor>
   </PropertyGroup>
   <ItemGroup>
-    <None Include="CheckIMUData.ino">
-      <FileType>CppCode</FileType>
-    </None>
     <None Include="IMUData.ino">
       <FileType>CppCode</FileType>
     </None>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="CommandProcess.hpp" />
-    <ClInclude Include="Serial.hpp" />
+    <ClInclude Include="CommandProcess.h" />
+    <ClInclude Include="Serial.h" />
     <ClInclude Include="IMUData.h" />
     <ClInclude Include="__vm\.IMUData.vsarduino.h" />
   </ItemGroup>
@@ -101,7 +98,7 @@
   </ImportGroup>
   <ProjectExtensions>
     <VisualStudio>
-      <UserProperties arduino.upload.port="COM3" />
+      <UserProperties arduino.upload.port="COM4" />
     </VisualStudio>
   </ProjectExtensions>
 </Project>

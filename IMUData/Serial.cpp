@@ -131,12 +131,12 @@ void serial::decode_COBS()
 
 		if (code != 0xFF && read_index != rx_message.size)
 		{
-			decoded_rx_message.message[write_index++] = '\0';
+			//decoded_rx_message.message[write_index++] = '\0';
 		}
 
 	}
 
-	decoded_rx_message.size = write_index + 1;
+	decoded_rx_message.size = write_index;
 	return;
 }
 /// \Get the maximum encoded buffer size needed for a given source size.
@@ -194,6 +194,7 @@ bool serial::val_checksum() {
 	uint16_t received_message_checksum = Fletcher16(decoded_rx_message.message, (decoded_rx_message.size - 2));
 	uint16_t checksum = (decoded_rx_message.message[decoded_rx_message.size - 2] << 8) | decoded_rx_message.message[decoded_rx_message.size - 1];
 	if (received_message_checksum == checksum) {
+		Serial.println("CheckSums Are Equal");
 		return true;
 	}
 	else {
@@ -205,19 +206,24 @@ bool serial::contains(byte* data, byte check, int checklocation) {
 	//A function which checks for a given byte at a location within a provided byte array(data).
 	if (data[checklocation] == check) {
 		//If byte at location is what it should be return true.
+		
 		return true;
 	}
 	else {
+		Serial.println(data[checklocation]);
+		Serial.println(check);
+		Serial.println("Message Not Address To Sensors");
 		return false;
 	}
 }
 
 bool serial::validatemessage() {
-	if (val_checksum() && contains(&(rx_message.message[0]), MessageID, incmessageprop.mess_ID)) {
+	if (val_checksum() & contains(decoded_rx_message.message, MessageID, incmessageprop.mess_ID)) {
 		//if Validitate the checksum equals to what we calculate and message ID is addressed to us return true
 		return true;
 	}
 	else {//Message not intended for us
+		Serial.println("ValidateMessageFailed.");
 		return false;//;//Leave Function
 	}
 }

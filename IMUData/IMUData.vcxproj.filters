@@ -16,7 +16,6 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="IMUData.ino" />
-    <None Include="CheckIMUData.ino" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="__vm\.IMUData.vsarduino.h">
@@ -25,10 +24,10 @@
     <ClInclude Include="IMUData.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Serial.hpp">
+    <ClInclude Include="Serial.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="CommandProcess.hpp">
+    <ClInclude Include="CommandProcess.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

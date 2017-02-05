@@ -34,7 +34,7 @@ public:
 	uint8_t message_size;
 	uint8_t dec_mess[size_message];//Decoded in ComingMessage*/
 
-	const byte MessageID = 1000;//0x0A in BYTE (message address to us)
+	const byte MessageID = B1000;//0x0A in BYTE (message address to us)
 	inc_messageprop incmessageprop = { 0,3,4,2 };
 
 	//Function responsilbe for obtaining data from serial, decoding it and store it in dec_message.
