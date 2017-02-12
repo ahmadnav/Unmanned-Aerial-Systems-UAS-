@@ -67,7 +67,8 @@ void RecieveAndSendMessage() {
 
 			if (CommandProcessObj.handlemessage(serialobj.decoded_rx_message.message)) {
 
-				serialobj.sendmessage(&CommandProcessObj.outgoingmessage[0]);
+				
+				serialobj.sendmessage(CommandProcessObj.outgoingmessage);
 			}
 			else {
 				return;

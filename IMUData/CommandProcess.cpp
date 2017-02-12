@@ -1,7 +1,17 @@
+#pragma once
 #include <Arduino.h>
 #include <CommandProcess.h>
-#include <Serial.h>
 
+#pragma region IMUSetup
+Adafruit_BNO055 bno = Adafruit_BNO055(55); //SCL to pin A5, SDA to pin A4
+#pragma endregion
+
+#pragma region GPSSetup
+/* Serial corresponds to 0 RX and 1 TX on Arduino UNO */
+#define GPSSerial Serial
+/* Connect to the GPS on the hardware port */
+Adafruit_GPS GPS(&GPSSerial);
+#pragma endregion
 
 bool CommandProcess::handlemessage(byte* message) {
 	
@@ -37,48 +47,63 @@ void CommandProcess::getIMUData() {
 
 	/*Convert int to byte array MSB to LSB*/
 	for (int i = 0; i <= maxbyteIMU; i++) {
-		IMU_x[i] = (IMUx >> (maxbyteIMU - i) * 8);
-		IMU_y[i] = (IMUy >> (maxbyteIMU - i) * 8);
-		IMU_z[i] = (IMUz >> (maxbyteIMU - i) * 8);
+		IMU_x[i] = (IMUx >> (maxbyteIMU - i) * 8) && 0xFF;
+		IMU_y[i] = (IMUy >> (maxbyteIMU - i) * 8) && 0xFF;
+		IMU_z[i] = (IMUz >> (maxbyteIMU - i) * 8) && 0xFF;
 	}
 }
 
 void CommandProcess::getGPSData() {
+	GPS.begin(9600);
 	int GPSlat = GPS.latitude * (10^GPS_precision);
 	int GPSlong = GPS.longitude * (10^GPS_precision);
 
 	/*Convert int to byte array MSB to LSB*/
 	for (int i = 0; i <= maxbyteGPS; i++) {
-		GPS_lat[i] = (GPSlat >> (maxbyteGPS - i) * 8);
-		GPS_long[i] = (GPSlong >> (maxbyteGPS - i) * 8);
+		GPS_lat[i] = (GPSlat >> (maxbyteGPS - i) * 8) && 0xFF;
+		GPS_long[i] = (GPSlong >> (maxbyteGPS - i) * 8) && 0xFF;
 	}
 
 }
 
 void CommandProcess::packoutgoingmessage(byte MessageID) {
-
+	int k = 0; //Array field incrementor
 	switch (MessageID)
 	{
 	case IMUID:
-		outgoingmessage[Index_IMUData.m_ID] = IMUID;//Message ID
-		outgoingmessage[Index_IMUData.length] = size_outgoingIMU - 2; //Size of outgoing IMUmessage subtract the 2 checksum bytes
-		insertbytearray(&outgoingmessage[0], &IMU_x[0], Index_IMUData.payload);//Insert the x orientation of IMU
-		insertbytearray(&outgoingmessage[0], &IMU_y[0], (Index_IMUData.payload + sizeof(IMU_x)));//Insert the y orientaion of IMU
-		insertbytearray(&outgoingmessage[0], &IMU_z[0], (Index_IMUData.payload + sizeof(IMU_y)));//Insert the y orientaion of IMU
+		
+		outgoingmessage[k] = IMUID;//Message ID
+		k = k + 2;//Increment IMUID, and the length byte(updated at end)
+		/// Insert the IMUData into outgoing array
+		insertbytearray(outgoingmessage, IMU_x, k, maxbyteIMU);//Insert the x orientation of IMU
+		k += maxbyteIMU;
+		insertbytearray(outgoingmessage, IMU_y, k, maxbyteIMU);//Insert the y orientaion of IMU
+		k += maxbyteIMU;
+		insertbytearray(outgoingmessage, IMU_z, k,maxbyteIMU);//Insert the y orientaion of IMU
+		k += maxbyteIMU;
+		///
+		outgoingmessage[1] = k++; //Length of outgoing IMUmessage without the 2 checksum bytes
 		break;
 	case GPSID:
-		outgoingmessage[Index_GPSData.m_ID] = GPSID;//Message ID
-		outgoingmessage[Index_GPSData.length] = size_outgoingGPS;
-		insertbytearray(&outgoingmessage[0], &GPS_long[0], Index_GPSData.payload);//Insert the longitude
-		insertbytearray(&outgoingmessage[0], &GPS_lat[0], (Index_GPSData.payload + sizeof(GPS_long)));//Insert the latitude
+		
+		outgoingmessage[k] = GPSID;//Message ID
+		k += 2;//Increment IMUID, and the length byte(updated at end)
+		
+		insertbytearray(outgoingmessage, GPS_long, k, maxbyteGPS);//Insert the longitude
+		k += maxbyteGPS;
+		insertbytearray(outgoingmessage, GPS_lat, k, maxbyteGPS);//Insert the latitude
+		k += maxbyteGPS;
+
+		outgoingmessage[1] = k++; // Update the outgoing message length.
 		break;
 	default:
 		break;
 	}
 }
 
-void CommandProcess::insertbytearray(byte* arr, byte* ins_arr,int ins_loc) {
-	int size = sizeof(ins_arr);//length of Insert Array.
+/*Insert ins_arr of size size in arr at ins_loc*/
+void CommandProcess::insertbytearray(byte* arr, byte* ins_arr,int ins_loc,int size) {
+	
 	for (int i = 0; i < size; i++) {
 		arr[ins_loc] = ins_arr[i];
 		ins_loc = ins_loc + 1;//Increment insert location.

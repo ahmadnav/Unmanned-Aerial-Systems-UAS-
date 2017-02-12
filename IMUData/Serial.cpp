@@ -1,3 +1,4 @@
+#pragma once
 #include <Arduino.h>
 #include <Wire.h>
 #include <Serial.h>
@@ -19,16 +20,16 @@ bool serial::getmessage() {
 						//If the current read is a 0 than we are at the end of the message. The peek function doesn't 
 						//delete the byte so it gets stored in data.
 						
-						rx_message.message[i] = Serial.read();//Delete 0 from buffer and store it in message.
+						rxtx_message.message[i] = Serial.read();//Delete 0 from buffer and store it in message.
 						Serial.println("Leaving Loop");
-						rx_message.size = i+1;
+						rxtx_message.size = i+1;
 						decode_COBS();
 						//Decode the incoming COBs message and store it in decoded message.
 
 						return true;//Get out of While Loop
 					}
 					Serial.println("Storing Data");
-					rx_message.message[i] = Serial.read();//Store the incoming bytes in array
+					rxtx_message.message[i] = Serial.read();//Store the incoming bytes in array
 					i++;
 				}
 				else //If we are greater than 255 bytes read and delete incoming message till its end 
@@ -65,8 +66,10 @@ void serial::printdata(byte* data) {
 /// \returns The number of bytes in the encoded buffer.
 /// \warning destination must have a minimum capacity of
 ///     (size + size / 254 + 1).
-size_t serial::encode_COBS(const uint8_t* source, size_t size, uint8_t* destination)
+/// Encode the COBS for the outgoing message
+void serial::encode_COBS(const uint8_t* source)
 {
+	int size = source[loc_messagelength];//The length of source file is stored in the second byte of byte array
 	size_t read_index = 0;
 	size_t write_index = 1;
 	size_t code_index = 0;
@@ -76,28 +79,27 @@ size_t serial::encode_COBS(const uint8_t* source, size_t size, uint8_t* destinat
 	{
 		if (source[read_index] == 0)
 		{
-			destination[code_index] = code;
+			rxtx_message.message[code_index] = code;
 			code = 1;
 			code_index = write_index++;
 			read_index++;
 		}
 		else
 		{
-			destination[write_index++] = source[read_index++];
+			rxtx_message.message[write_index++] = source[read_index++];
 			code++;
 
 			if (code == 0xFF)
 			{
-				destination[code_index] = code;
+				rxtx_message.message[code_index] = code;
 				code = 1;
 				code_index = write_index++;
 			}
 		}
 	}
 
-	destination[code_index] = code;
+	rxtx_message.message[code_index] = code;
 
-	return write_index;
 }
 
 /// \brief Decode a COBS-encoded buffer.
@@ -113,11 +115,11 @@ void serial::decode_COBS()
 	uint8_t code;
 	uint8_t i;
 
-	while (read_index < rx_message.size)
+	while (read_index < rxtx_message.size)
 	{
-		code = rx_message.message[read_index];
+		code = rxtx_message.message[read_index];
 
-		if (read_index + code > rx_message.size && code != 1)
+		if (read_index + code > rxtx_message.size && code != 1)
 		{
 			break;
 		}
@@ -126,10 +128,10 @@ void serial::decode_COBS()
 
 		for (i = 1; i < code; i++)
 		{
-			decoded_rx_message.message[write_index++] = rx_message.message[read_index++];
+			decoded_rx_message.message[write_index++] = rxtx_message.message[read_index++];
 		}
 
-		if (code != 0xFF && read_index != rx_message.size)
+		if (code != 0xFF && read_index != rxtx_message.size)
 		{
 			//decoded_rx_message.message[write_index++] = '\0';
 		}
@@ -148,7 +150,7 @@ int serial::getEncodedBufferSize(int sourceSize)
 	return sourceSize + sourceSize / 254 + 1;
 }
 
-//A function which computes the flecture checksum of a provided byte array, and its size.
+//A function which computes the flecture checksum of a provided byte array, and uptill size.
 uint16_t serial::Fletcher16(uint8_t *data, int count)
 {
 	uint16_t sum1 = 0;
@@ -161,38 +163,12 @@ uint16_t serial::Fletcher16(uint8_t *data, int count)
 	}
 	return (sum2 << 8) | sum1;
 }
-/*
-uint16_t serial::mess_checksum16() {
 
-	byte checksumarr[size_message];//New Array Which Is message size -2
-	for(int k =0; k < (size_message - 2); k++) {
-		checksumarr[k] = dec_mess[k];
-	}
-	uint16_t c_sum = Fletcher16(&(checksumarr[0]), (size_message - 2));
-	return c_sum;
-}
-
-uint16_t serial::IMUData_checksum16() {
-	byte checksumarr[size_outgoingIMU];//New Array Which Is message size -2
-	for (int k = 0; k < (size_outgoingIMU - 2); k++) {
-		checksumarr[k] = dec_mess[k];
-	}
-	uint16_t c_sum = Fletcher16(&(checksumarr[0]), (size_outgoingIMU - 2));
-	return c_sum;
-}
-
-uint16_t serial::GPSData_checksum16() {
-	byte checksumarr[size_outgoingGPS];//New Array Which Is message size -2
-	for (int k = 0; k < (size_outgoingGPS - 2); k++) {
-		checksumarr[k] = dec_mess[k];
-	}
-	uint16_t c_sum = Fletcher16(&(checksumarr[0]), (size_outgoingGPS - 2));
-	return c_sum;
-}*/
-
+/*Validate the checksum of incoming message*/
 bool serial::val_checksum() {
 	uint16_t received_message_checksum = Fletcher16(decoded_rx_message.message, (decoded_rx_message.size - 2));
 	uint16_t checksum = (decoded_rx_message.message[decoded_rx_message.size - 2] << 8) | decoded_rx_message.message[decoded_rx_message.size - 1];
+
 	if (received_message_checksum == checksum) {
 		Serial.println("CheckSums Are Equal");
 		return true;
@@ -202,6 +178,7 @@ bool serial::val_checksum() {
 	}
 }
 
+/*Ensure that the message is addressed to us*/
 bool serial::contains(byte* data, byte check, int checklocation) {
 	//A function which checks for a given byte at a location within a provided byte array(data).
 	if (data[checklocation] == check) {
@@ -217,6 +194,7 @@ bool serial::contains(byte* data, byte check, int checklocation) {
 	}
 }
 
+/*Ensures that the message recieved is addressed to sensors, and that its checksum is correct*/
 bool serial::validatemessage() {
 	if (val_checksum() & contains(decoded_rx_message.message, MessageID, incmessageprop.mess_ID)) {
 		//if Validitate the checksum equals to what we calculate and message ID is addressed to us return true
@@ -228,11 +206,19 @@ bool serial::validatemessage() {
 	}
 }
 
+/*Calculated the checksum, appends it to out going message and Sends an out going message recieved from commandprocess*/
 void serial::sendmessage(byte* message) {
 	//message[]
-	const int size = sizeof(message) + 2;
-	//size of COBs encoded buffer is size of non encoded buffer +1 
-	byte outgoingmessage[size];
-	encode_COBS(message, sizeof(message), outgoingmessage);
-	Serial.write(message, sizeof(message));
+	int size = message[loc_messagelength];//Size of the array recieved
+
+	uint16_t checksum = Fletcher16(message, size);
+	//Append the lower and upper CheckSums
+	for (int c = 1; c < 3; c++) {
+		size++;//Increase the size of array by one (for the Cecksums)
+		message[size - 1] = (checksum >> (c*8)) && 0xFF;//Appends Lower And Upper checksums
+	}
+	
+	encode_COBS(message);
+
+	Serial.write(rxtx_message.message, (message[loc_messagelength]));//Send the message of length over serial.
 }

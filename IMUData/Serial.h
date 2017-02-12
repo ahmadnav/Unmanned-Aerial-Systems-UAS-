@@ -14,8 +14,7 @@ class serial {
 	};
 public:
 	static const int MAX_MESSAGE_SIZE = 0xFF;//Length of byte array of incoming message from GCD
-	static const int size_outgoingGPS = 11; //Size of Array carrying outgoing GPSData
-	static const int size_outgoingIMU = 16;//Size of Array carrying outgoing IMUData
+	const int loc_messagelength = 1;//Location of message length for all transmitted/recieving messages.
 
 	typedef struct message_buffer
 	{
@@ -24,17 +23,12 @@ public:
 	} message_buffer;
 
 
-	message_buffer rx_message;//Recieve message
-	message_buffer decoded_rx_message;//Decoded recieve message
-	message_buffer tx_message;//Transmit Message.
-	message_buffer decoded_tx_message;
-	/*Outgoing Message Properties*/
-	/*uint8_t outgoingmessage[MAX_MESSAGE_SIZE];//Outgoing message.
-	uint8_t message[MAX_MESSAGE_SIZE];//Incoming Message
-	uint8_t message_size;
-	uint8_t dec_mess[size_message];//Decoded in ComingMessage*/
+	message_buffer rxtx_message;//Incoming message encoded in cobs/ Also stores encoded COBS for out going message
+	message_buffer decoded_rx_message;//Decoded Incoming message
+	//message_buffer tx_message;//Transmit COBS Transmited Message.
+	//message_buffer decoded_tx_message;//Transmitted decoded Message
 
-	const byte MessageID = B1000;//0x0A in BYTE (message address to us)
+	const byte MessageID = B1010;//0x0A in BYTE (message address to us)
 	inc_messageprop incmessageprop = { 0,3,4,2 };
 
 	//Function responsilbe for obtaining data from serial, decoding it and store it in dec_message.
@@ -44,7 +38,7 @@ public:
 	void printdata(byte* data);
 	
 
-	size_t encode_COBS(const uint8_t* source, size_t size, uint8_t* destination);
+	void encode_COBS(const uint8_t* source);
 	
 	//Encodes an message to dec_message in COBS.
 	void decode_COBS();
@@ -54,11 +48,11 @@ public:
 
 	uint16_t Fletcher16(uint8_t *data, int count);
 
-	uint16_t mess_checksum16();
-	//Function which calculates the 16 bit checksum of message array.
+	//uint16_t mess_checksum16();
+	////Function which calculates the 16 bit checksum of message array.
 
-	uint16_t IMUData_checksum16();
-	uint16_t GPSData_checksum16();
+	//uint16_t IMUData_checksum16();
+	//uint16_t GPSData_checksum16();
 
 	bool val_checksum();
 	//Validate the checksum data of incoming message, returns true if calculated checksum is equal to the one attatched 
